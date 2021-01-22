@@ -1,0 +1,581 @@
+#!/bin/sh
+
+# Abort on error.
+set -e -o pipefail
+
+MKPICO_ROOT=`pwd`
+MKPICO_LOG_DIR="${MKPICO_ROOT}/log"
+MKPICO_BUILD_DIR="${MKPICO_ROOT}/build"
+MKPICO_SOURCE_DIR="${MKPICO_ROOT}/source"
+MKPICO_CROSS_TOOLS="${MKPICO_ROOT}/cross-tools"
+MKPICO_SYSROOT="${MKPICO_ROOT}/sysroot"
+
+MKPICO_LOG_HISTORY=3
+
+MKPICO_PREFIX="/usr"
+
+MKPICO_CFLAGS="-O2 -pipe -fPIC"
+MKPICO_CXXFLAGS="-O2 -pipe -fPIC"
+MKPICO_LDFLAGS=""
+
+MKPICO_CORES=$(grep -c '^processor' /proc/cpuinfo)
+
+GNU_MIRROR="https://ftp.gnu.org/gnu/"
+GNU_KEYRING="gnu-keyring.gpg"
+
+# Package information
+BINUTILS_VERSION="2.35"
+BINUTILS_URL="${GNU_MIRROR}/binutils"
+
+GCC_VERSION="10.2.0"
+GCC_URL="${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}"
+
+MPFR_VERSION="3.1.4"
+MPFR_URL="${GNU_MIRROR}/mpfr"
+
+MPC_VERSION="1.0.3"
+MPC_URL="${GNU_MIRROR}/mpc"
+
+GMP_VERSION="6.1.0"
+GMP_URL="${GNU_MIRROR}/gmp"
+
+GDB_VERSION="10.1"
+GDB_URL="${GNU_MIRROR}/gdb"
+
+NEWLIB_VERSION="4.1.0"
+NEWLIB_URL="https://sourceware.org/pub/newlib/"
+
+MKPICO_VERSION="0.1"
+MKPICO_USAGE=$(cat <<EOF
+Usage: $(basename "${0}") [-hv]
+Builds a full featured arm-none-eabi toolchain for the RaspberryPi Pico
+including a gcc, newlib and an optional gdb.
+
+-h|--help:
+	Displays this help.
+-v|--version:
+	Displays the current version of this script.
+-l|--latest:
+	This will check upstream for newer versions of the specified libraries
+	and try to build with these latest package versions. If specific versions
+	are set using the corresponding --build-* option, this version will be used.
+-d|--dump-latest:
+	Dumps a list of the latest available version.
+-p|--prefix:
+	Installation prefix (default ${MKPICO_PREFIX}).
+--build-gcc:
+	Build the specified version of the arm-none-eabi-gcc (default ${GCC_VERSION}).
+--build-newlib:
+	Build the specified version of the newlib (default ${NEWLIB_VERSION}).
+--build-gmp:
+	Build the specified version of gmp (default ${GMP_VERSION}).
+--build-mpc:
+	Build the specified version of mpc (default ${MPC_VERSION}).
+--build-mpfr:
+	Build the specified version of mpfr (default ${MPFR_VERSION}).
+-g|--build-gdb:
+	Additionally built the GNU debugger (default ${GDB_VERSION}).
+
+All --build-* options may be followed by a space seperated package version.
+In this case $(basename "${0}") will always attempt to build the custom
+versions even if --latest is used.
+EOF
+)
+
+# Helper functions.
+pushd() {
+	command pushd "$@" > /dev/null
+}
+
+popd() {
+	command popd > /dev/null
+}
+
+info() {
+	echo -e "\033[94mINFO:\033[39m $*" >&2
+}
+
+warning() {
+	echo -e "\033[33mCAUTION:\033[39m $*" >&2
+}
+
+usage() {
+	local rc=0
+
+	if [ -n "${1}" ]; then
+		rc="${1}"
+	fi
+
+	if [ -n "${2}" ]; then
+		echo -e "ERROR: ${2}\n"
+	fi
+
+	echo "${MKPICO_USAGE}"
+
+	exit "${rc}"
+}
+
+hasValue() {
+	if [ -n "${1}" ] && ! case "${1}" in -*) true;; *) false;; esac; then
+		return 0
+	fi
+
+	return 1
+}
+
+parseOptions() {
+	local nextOpt=0
+
+	# Parse the command line parameters.
+	while [ -n "${1+xxx}" ]; do
+		case "${1}" in
+			--help|-h)
+				usage
+				;;
+			--version|-v)
+				;;
+			-l|--latest)
+				;;
+			-d|--dump-latest)
+				dumpLatest
+				exit 0
+				;;
+			-p|--prefix)
+				if hasValue "${2}"; then
+					MKPICO_PREFIX="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			--build-gcc)
+				if hasValue "${2}"; then
+					GCC_VERSION="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			--build-newlib)
+				if hasValue "${2}"; then
+					NEWLIB_VERSION="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			--build-gmp)
+				if hasValue "${2}"; then
+					GMP_VERSION="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			--build-mpc)
+				if hasValue "${2}"; then
+					MPC_VERSION="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			--build-mpfr)
+				if hasValue "${2}"; then
+					MPFR_VERSION="${2}"
+					shift
+				else
+					usage 1 "Missing value for option ${1}"
+				fi
+
+				;;
+			-g|--build-gdb)
+				if hasValue "${2}"; then
+					GDB_VERSION="${2}"
+					shift
+				fi
+
+				;;
+			-*)
+				usage 1 "Unrecognized option: ${1}"
+				;;
+			*)
+				break
+				;;
+		esac
+
+		shift
+	done
+}
+
+logrotate() {
+	LOG_DIR=$1
+	FILE=$2
+	COUNT=$3
+
+	if [ ! -d "${LOG_DIR}" ]; then
+		mkdir -p "${LOG_DIR}"
+	fi
+
+	if [ -f "${LOG_DIR}/${FILE}.${COUNT}" ]; then
+		rm "${LOG_DIR}/${FILE}.${COUNT}"
+	fi
+
+	while (( --COUNT >= 0 )); do
+		if [ -f "${LOG_DIR}/${FILE}.${COUNT}" ]; then
+			mv "${LOG_DIR}/${FILE}.${COUNT}" "${LOG_DIR}/${FILE}.$((COUNT+1))"
+		fi
+	done
+
+	if [ -f "${LOG_DIR}/${FILE}" ]; then
+		mv "${LOG_DIR}/${FILE}" "${LOG_DIR}/${FILE}.0"
+	fi
+}
+
+findPackages() {
+	local url="${1}"
+	if [ -z "${url}" ]; then
+		echo "No remote server url given"
+		exit 1
+	fi
+
+	local prefix="${2}"
+	if [ -z "${prefix}" ]; then
+		echo "no package prefix given"
+		exit 1
+	fi
+
+	curl -k -L ${url} 2>/dev/null \
+		| sed -n "s/.*href=\"[^\"]*\(${prefix}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\)[^\"]*\).*/\1/p"
+}
+
+findLatestPackage() {
+	local listing="$(findPackages "${1}" "${2}")"
+
+	echo "${listing}" \
+		| sort -fir \
+		| head -n 1
+}
+
+findLatestVersion() {
+	latestPackage="$(findLatestPackage "${1}" "${2}")"
+
+	echo "${latestPackage}" \
+		| sed -n "s/${2}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\).*/\1/p"
+}
+
+dumpLatest() {
+	printf "%-15s %-10s\n" "Package" "Version"
+	printf "%15s %10s\n" "binutils" "$(findLatestVersion "${BINUTILS_URL}" "binutils-")"
+	printf "%15s %10s\n" "gcc" "$(findLatestVersion "${GCC_URL}" "gcc-")"
+	printf "%15s %10s\n" "mpfr" "$(findLatestVersion "${MPFR_URL}" "mpfr-")"
+	printf "%15s %10s\n" "mpc" "$(findLatestVersion "${MPC_URL}" "mpc-")"
+	printf "%15s %10s\n" "gmp" "$(findLatestVersion "${GMP_URL}" "gmp-")"
+	printf "%15s %10s\n" "gdb" "$(findLatestVersion "${GDB_URL}" "gdb-")"
+	printf "%15s %10s\n" "newlib" "$(findLatestVersion "${NEWLIB_URL}" "newlib-")"
+}
+
+extract() {
+	local file="${1}"
+	local filename="$(echo "${file}" | awk '{print tolower($0)}')"
+
+	info "Extracting ${file}"
+
+	local target=""
+	if [ -n "${2}" ] && [ -d "${2}" ]; then
+		target="$(readlink -f "${2}")"
+	fi
+
+	pushd "${target}"
+	case "${filename}" in
+		*.tar* | *.tbz | *.tgz)
+			tar xf "${file}" ;;
+		*.lzma) unlzma "${file}" ;;
+		*.bz2) bunzip2 "${file}" ;;
+		*.rar) unrar x -ad "${file}" ;;
+		*.gz) gunzip "${file}" ;;
+		*.zip) unzip "${file}" ;;
+		*.Z) uncompress "${file}" ;;
+		*.7z) 7z x "${file}" ;;
+		*.xz) unxz "${file}" ;;
+		*)
+			popd
+			echo "extract: '${file}' - unknown archive method"
+			return 1
+			;;
+	esac
+	popd
+
+	return 0
+}
+
+isValidSignature() {
+	gpg --verify --keyring "${MKPICO_SOURCE_DIR}/${1}" "${MKPICO_SOURCE_DIR}/${2}"
+}
+
+download() {
+	local url="${1}"
+	local file="${2}"
+	local signature="${3}"
+
+	if [ -n "${signature}" ]; then
+		info "Downloading ${signature}"
+		# TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
+		curl -L -k -o "${MKPICO_SOURCE_DIR}/${signature}" "${url}/${signature}"
+	fi
+
+	if [ -f "${MKPICO_SOURCE_DIR}/${file}" ]; then
+		# Check using signature if file is corrupted and skip file if not.
+		if [ -n "${signature}" ] && isValidSignature "${GNU_KEYRING}" "${signature}" ; then
+			info "${file} in cache - skipping."
+			return
+		fi
+	fi
+
+	info "Downloading ${file}"
+	# TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
+	curl -L -k -o "${MKPICO_SOURCE_DIR}/${file}" "${url}/${file}"
+
+	info "Verifying signature"
+	# TODO: Check using signature if download was successful
+	# Check using signature if file is corrupted and skip file if not.
+	if [ -n "${signature}" ] && ! isValidSignature "${GNU_KEYRING}" "${signature}" ; then
+		warning "${file} has invalid signature."
+	fi
+}
+
+downloadExtract() {
+	download "${1}" "${2}" "${3}"
+	extract "${MKPICO_SOURCE_DIR}/${2}" "${MKPICO_BUILD_DIR}"
+}
+
+buildPackage() {
+	local package="${1}"
+	local package_version="${2}"
+	local package_url="${3}"
+	local package_name="${4}"
+	local package_signature="${5}"
+
+	shift 5
+
+	if ! echo "libstdc++" | grep -qsw "${package}"; then
+		downloadExtract "${package_url}" "${package_name}" "${package_signature}"
+
+		# Download prerequisits for gcc.
+		if echo "gcc" | grep -qsw "${package}"; then
+			info "Checking for contrib/download_prerequisites"
+			if [ -f "${MKPICO_BUILD_DIR}/${package}-${package_version}/contrib/download_prerequisites" ]; then
+				info "Downloading gcc prerequisites"
+				pushd "${MKPICO_BUILD_DIR}/${package}-${package_version}/"
+				./contrib/download_prerequisites
+				popd
+			fi
+		fi
+
+		mkdir -p "${MKPICO_BUILD_DIR}/${package}"
+		pushd "${MKPICO_BUILD_DIR}/${package}"
+
+		info "Configuring ${package}"
+
+		if [ -f "../${package}-${package_version}/configure" ]; then
+			logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
+
+			CFLAGS="${MKPICO_CFLAGS}" \
+			CXXFLAGS="${MKPICO_CXXFLAGS}" \
+			LDFLAGS="${MKPICO_LDFLAGS}" \
+			../"${package}"-"${package_version}"/configure "${@}" 2>&1 \
+				| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
+		fi
+	else
+		pushd "${MKPICO_BUILD_DIR}/gcc"
+	fi
+
+	info "Building ${package}"
+
+	logrotate "${MKPICO_LOG_DIR}" "${package}-make.log" "${MKPICO_LOG_HISTORY}"
+
+	if echo "gcc" | grep -qsw "${package}"; then
+		make -j${MKPICO_CORES} all-gcc all-target-libgcc 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
+	elif echo "libstdc++" | grep -qsw "${package}"; then
+		make -j${MKPICO_CORES} all-target-libstdc++-v3 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
+	else
+		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
+	fi
+
+	if echo "gmp mpc mpfr" | grep -qsw "${package}"; then
+		info "Checking build result of ${package}"
+		logrotate "${MKPICO_LOG_DIR}" "${package}-make-check.log" "${MKPICO_LOG_HISTORY}"
+		make check 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make-check.log"
+	fi
+
+	info "Installing ${package}"
+
+	logrotate "${MKPICO_LOG_DIR}" "${package}-make-install.log" "${MKPICO_LOG_HISTORY}"
+
+	if echo "gcc" | grep -qsw "${package}"; then
+		make install-gcc install-target-libgcc DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
+	elif echo "libstdc++" | grep -qsw "${package}"; then
+		make install-target-libstdc++-v3 DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
+	else
+		make install DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
+	fi
+
+	popd
+
+	#rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/${package}*"
+}
+
+error() {
+	local parent_lineno="${1}"
+	local message="${2}"
+	local code="${3:-1}"
+
+	if [ -n "${message}" ] ; then
+		echo "Error on or near line ${parent_lineno}: ${message}; exiting with status ${code}"
+	else
+		echo "Error on or near line ${parent_lineno}; exiting with status ${code}"
+	fi
+
+	exit "${code}"
+}
+
+trap 'error ${LINENO}' \
+	ABRT BUS FPE \
+	ILL SEGV SYS \
+	TRAP XCPU XFSZ
+
+# Parse command line options.
+parseOptions "${@}"
+
+# Build up package information.
+BINUTILS_PACKAGE="binutils-${BINUTILS_VERSION}.tar.xz"
+BINUTILS_SIGNATURE="${BINUTILS_PACKAGE}.sig"
+
+GCC_PACKAGE="gcc-${GCC_VERSION}.tar.xz"
+GCC_SIGNATURE="${GCC_PACKAGE}.sig"
+
+MPFR_PACKAGE="mpfr-${MPFR_VERSION}.tar.xz"
+MPFR_SIGNATURE="${MPFR_PACKAGE}.sig"
+
+MPC_PACKAGE="mpc-${MPC_VERSION}.tar.gz"
+MPC_SIGNATURE="${MPC_PACKAGE}.sig"
+
+GMP_PACKAGE="gmp-${GMP_VERSION}.tar.xz"
+GMP_SIGNATURE="${GMP_PACKAGE}.sig"
+
+GDB_PACKAGE="gdb-${GDB_VERSION}.tar.xz"
+GDB_SIGNATURE="${GDB_PACKAGE}.sig"
+
+NEWLIB_PACKAGE="newlib-${NEWLIB_VERSION}.tar.gz"
+NEWLIB_SIGNATURE=""
+
+info "Preparing build environment"
+
+# Setup build environment.
+mkdir -p "${MKPICO_CROSS_TOOLS}"
+mkdir -p "${MKPICO_SOURCE_DIR}"
+mkdir -p "${MKPICO_BUILD_DIR}"
+mkdir -p "${MKPICO_LOG_DIR}"
+mkdir -p "${MKPICO_SYSROOT}/usr/include"
+
+downloadExtract "${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}"
+
+if ! [ -d "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}" ]; then
+	warning "Failed to extract newlib."
+	exit 1
+fi
+
+# The -RT combination would be preferable, but is not supported by all cp implementations.
+cp -r "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}/include" "${MKPICO_SYSROOT}/usr/include"
+
+#rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/*"
+
+# Ensure CFLAGS are not set during build.
+unset CFLAGS
+
+# Prepare build environment.
+PREFIX="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}"
+export PREFIX
+
+PATH=${PATH}:${PREFIX}/bin
+export PATH
+
+info "Downloading gnu keyring"
+
+# Download the gnu keyring needed to verify signatures.
+# TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
+curl -s -L -k -o "${MKPICO_SOURCE_DIR}/${GNU_KEYRING}" "${GNU_MIRROR}/${GNU_KEYRING}" > /dev/null
+
+info "Installing packages"
+
+# Download, build and install binutils.
+buildPackage "binutils" "${BINUTILS_VERSION}" \
+	"${BINUTILS_URL}" "${BINUTILS_PACKAGE}" "${BINUTILS_SIGNATURE}" \
+	--target=arm-none-eabi \
+	--prefix="${MKPICO_PREFIX}" \
+	--with-cpu=cortex-m0 \
+	--with-sysroot="${MKPICO_SYSROOT}" \
+	--with-pkgversion="mkpico" \
+	--program-prefix=arm-none-eabi- \
+	--enable-languages=c,c++ \
+	--with-no-thumb-interwork \
+	--with-mode=thumb \
+	--disable-werror \
+	--disable-nls
+
+# Download, build and install gcc for arm-none-eabi.
+buildPackage "gcc" "${GCC_VERSION}" \
+	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
+	--target=arm-none-eabi \
+	--prefix="${MKPICO_PREFIX}" \
+	--with-cpu=cortex-m0 \
+	--with-sysroot="${MKPICO_SYSROOT}" \
+	--with-pkgversion="mkpico" \
+	--program-prefix=arm-none-eabi- \
+	--enable-languages=c,c++ \
+	--with-newlib \
+	--with-mode=thumb \
+	--disable-multilib \
+	--with-no-thumb-interwork \
+	--disable-nls \
+	--disable-werror \
+	--disable-shared
+
+# --with-build-sysroot="${MKPICO_CROSS_TOOLS}" \
+
+# Download, build and install libc for arm-none-eabi.
+buildPackage "newlib" "${NEWLIB_VERSION}" \
+	"${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}" \
+	--target=arm-none-eabi \
+	--prefix="${MKPICO_PREFIX}" \
+	--enable-languages=c,c++ \
+	--disable-multilib \
+	--disable-newlib-supplied-syscalls
+
+# Build and install libstdc++.
+buildPackage "libstdc++" "${GCC_VERSION}" \
+	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
+
+# Download, build and install gdb for arm-none-eabi.
+buildPackage "gdb" "${GDB_VERSION}" \
+	"${GDB_URL}" "${GDB_PACKAGE}" "${GDB_SIGNATURE}" \
+	--target=arm-none-eabi \
+	--prefix="${MKPICO_PREFIX}" \
+	--with-pkgversion="mkpico" \
+	--program-prefix=arm-none-eabi- \
+	--enable-languages=c,c++ \
+	--disable-werror \
+	--disable-multilib
+
+info "Logs have been placed in ${MKPICO_LOG_DIR}."
+info "Done."
