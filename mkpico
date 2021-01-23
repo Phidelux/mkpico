@@ -408,9 +408,6 @@ buildPackage() {
 	if echo "gcc-stage1" | grep -qsw "${package}"; then
 		make -j${MKPICO_CORES} all-gcc all-target-libgcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
-	elif echo "gcc" | grep -qsw "${package}"; then
-		make -j${MKPICO_CORES} 2>&1 \
-			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	else
 		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
@@ -427,9 +424,6 @@ buildPackage() {
 
 	if echo "gcc-stage1" | grep -qsw "${package}"; then
 		make install-gcc install-target-libgcc DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
-			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
-	elif echo "gcc" | grep -qsw "${package}"; then
-		make install DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	else
 		make install DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
