@@ -525,17 +525,16 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	"${BINUTILS_URL}" "${BINUTILS_PACKAGE}" "${BINUTILS_SIGNATURE}" \
 	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
+	--infodir=${MKPICO_PREFIX}/share/info \
+	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-cpu=cortex-m0 \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_PLATFORM}-" \
-	--enable-languages=c,c++ \
-	--with-no-thumb-interwork \
-	--with-mode=thumb \
 	--disable-werror \
-	--disable-nls
+	--disable-nls \
+	--enable-deterministic-archives
 
 # Download, build and install a stage 1 gcc.
 buildPackage "gcc-stage1" "${GCC_VERSION}" \
