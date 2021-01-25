@@ -391,16 +391,32 @@ buildPackage() {
 
 	info "Configuring ${package}"
 
-	if [ -f "../${real_package}-${package_version}/configure" ]; then
-		logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
+	logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
 
+	if echo "gcc" | grep -qsw "${package}"; then
+		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}" \
+		CXXFLAGS="${MKPICO_CXXFLAGS}" \
+		LDFLAGS="-L${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/lib" \
+		CC=/usr/bin/gcc \
+		CXX=/usr/bin/g++ \
+		LD=/usr/bin/ld \
+		NM=/usr/bin/nm \
+		AS=/usr/bin/as \
+		AR=/usr/bin/ar \
+		RANLIB=/usr/bin/ranlib \
+		STRIP=/usr/bin/strip \
+		OBJCOPY=/usr/bin/objcopy \
+		OBJDUMP=/usr/bin/objdump \
+		READELF=/usr/bin/readelf \
+		READELF_FOR_TARGET="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}/bin/${MKPICO_PLATFORM}-readelf" \
+		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
+	else
 		CFLAGS="${MKPICO_CFLAGS}" \
 		CXXFLAGS="${MKPICO_CXXFLAGS}" \
 		LDFLAGS="${MKPICO_LDFLAGS}" \
 		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
-	else
-		warning "No configure script for ${package} found"
 	fi
 
 	info "Building ${package}"
@@ -409,6 +425,10 @@ buildPackage() {
 
 	if echo "gcc-stage1" | grep -qsw "${package}"; then
 		make -j${MKPICO_CORES} all-gcc all-target-libgcc 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
+	elif echo "newlib" | grep -qsw "${package}"; then
+		make -j${MKPICO_CORES} all \
+			CROSS_CFLAGS="-O2 -g -march=armv6s-m -mtune=cortex-m0plus -mthumb -mfloat-abi=soft -pipe -Wl,--no-copy-dt-needed-entries,--as-needed -Wl,--build-id -Wdate-time" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	else
 		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
@@ -498,7 +518,7 @@ if ! [ -d "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}" ]; then
 fi
 
 # The -RT combination would be preferable, but is not supported by all cp implementations.
-cp -r "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}/include" "${MKPICO_SYSROOT}/usr/include"
+cp -r "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}/include" "${MKPICO_SYSROOT}/usr"
 
 #rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/*"
 
@@ -528,8 +548,6 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--with-sysroot="${MKPICO_SYSROOT}" \
-	--with-cpu=cortex-m0 \
-	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_PLATFORM}-" \
 	--disable-werror \
@@ -541,7 +559,6 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
 	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--with-cpu=cortex-m0 \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_PLATFORM}-" \
@@ -568,17 +585,10 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--with-newlib \
 	--disable-shared \
 	--disable-threads \
-	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin"
-
-#	--with-newlib \
-#	--with-mode=thumb \
-#	--disable-multilib \
-#	--with-no-thumb-interwork \
-#	--disable-nls \
-#	--disable-werror \
-#	--disable-shared
-
-# --with-build-sysroot="${MKPICO_CROSS_TOOLS}" \
+	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
+	--with-float=soft
 
 # Download, build and install libc.
 buildPackage "newlib" "${NEWLIB_VERSION}" \
@@ -596,11 +606,13 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--program-prefix="${MKPICO_PLATFORM}-" \
-	--with-cpu=cortex-m0 \
 	--with-gnu-as \
 	--with-gnu-ld \
 	--with-newlib \
 	--enable-clocale=gnu \
+	--enable-__cxa_atexit \
+	--enable-long-long \
+	--enable-c99 \
 	--disable-multilib \
 	--disable-threads \
 	--enable-libssp \
@@ -612,8 +624,12 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--disable-interpreter \
 	--disable-libstdcxx-pch \
 	--without-ppl \
-	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
-	--with-pkgversion="mkpico"
+	--without-cloog \
+	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
+	--with-pkgversion="mkpico" \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
+	--with-float=soft
 
 # Download, build and install gdb.
 buildPackage "gdb" "${GDB_VERSION}" \
