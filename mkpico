@@ -3,6 +3,8 @@
 # Abort on error.
 set -e -o pipefail
 
+MKPICO_PLATFORM="arm-none-eabi"
+
 MKPICO_ROOT=`pwd`
 MKPICO_LOG_DIR="${MKPICO_ROOT}/log"
 MKPICO_BUILD_DIR="${MKPICO_ROOT}/build"
@@ -48,7 +50,7 @@ NEWLIB_URL="https://sourceware.org/pub/newlib/"
 MKPICO_VERSION="0.1"
 MKPICO_USAGE=$(cat <<EOF
 Usage: $(basename "${0}") [-hv]
-Builds a full featured arm-none-eabi toolchain for the RaspberryPi Pico
+Builds a full featured ${MKPICO_PLATFORM} toolchain for the RaspberryPi Pico
 including a gcc, newlib and an optional gdb.
 
 -h|--help:
@@ -64,7 +66,7 @@ including a gcc, newlib and an optional gdb.
 -p|--prefix:
 	Installation prefix (default ${MKPICO_PREFIX}).
 --build-gcc:
-	Build the specified version of the arm-none-eabi-gcc (default ${GCC_VERSION}).
+	Build the specified version of the ${MKPICO_PLATFORM} (default ${GCC_VERSION}).
 --build-newlib:
 	Build the specified version of the newlib (default ${NEWLIB_VERSION}).
 --build-gmp:
@@ -521,29 +523,29 @@ info "Installing packages"
 # Download, build and install binutils.
 buildPackage "binutils" "${BINUTILS_VERSION}" \
 	"${BINUTILS_URL}" "${BINUTILS_PACKAGE}" "${BINUTILS_SIGNATURE}" \
-	--target=arm-none-eabi \
+	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--with-cpu=cortex-m0 \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix=arm-none-eabi- \
+	--program-prefix="${MKPICO_PLATFORM}-" \
 	--enable-languages=c,c++ \
 	--with-no-thumb-interwork \
 	--with-mode=thumb \
 	--disable-werror \
 	--disable-nls
 
-# Download, build and install a stage 1 gcc for arm-none-eabi.
+# Download, build and install a stage 1 gcc.
 buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
-	--target=arm-none-eabi \
+	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--with-cpu=cortex-m0 \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix=arm-none-eabi- \
+	--program-prefix="${MKPICO_PLATFORM}-" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--with-gnu-as \
@@ -567,7 +569,7 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--with-newlib \
 	--disable-shared \
 	--disable-threads \
-	--with-build-time-tools=${MKPICO_PREFIX}/arm-none-eabi/bin
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin"
 
 #	--with-newlib \
 #	--with-mode=thumb \
@@ -579,23 +581,23 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 
 # --with-build-sysroot="${MKPICO_CROSS_TOOLS}" \
 
-# Download, build and install libc for arm-none-eabi.
+# Download, build and install libc.
 buildPackage "newlib" "${NEWLIB_VERSION}" \
 	"${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}" \
-	--target=arm-none-eabi \
+	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--enable-languages=c,c++ \
 	--disable-multilib \
 	--disable-newlib-supplied-syscalls
 
-# Build and install gcc for arm-none-eabi.
+# Build and install gcc.
 buildPackage "gcc" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
-	--target=arm-none-eabi \
+	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
-	--program-prefix=arm-none-eabi- \
+	--program-prefix="${MKPICO_PLATFORM}-" \
 	--with-cpu=cortex-m0 \
 	--with-gnu-as \
 	--with-gnu-ld \
@@ -612,16 +614,16 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--disable-interpreter \
 	--disable-libstdcxx-pch \
 	--without-ppl \
-	--with-build-time-tools=${MKPICO_PREFIX}/arm-none-eabi/bin \
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
 	--with-pkgversion="mkpico"
 
-# Download, build and install gdb for arm-none-eabi.
+# Download, build and install gdb.
 buildPackage "gdb" "${GDB_VERSION}" \
 	"${GDB_URL}" "${GDB_PACKAGE}" "${GDB_SIGNATURE}" \
-	--target=arm-none-eabi \
+	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix=arm-none-eabi- \
+	--program-prefix="${MKPICO_PLATFORM}-" \
 	--enable-languages=c,c++ \
 	--disable-werror \
 	--disable-multilib
