@@ -585,7 +585,6 @@ buildPackage "newlib" "${NEWLIB_VERSION}" \
 	"${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}" \
 	--target="${MKPICO_PLATFORM}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--enable-languages=c,c++ \
 	--disable-multilib \
 	--disable-newlib-supplied-syscalls
 
