@@ -239,6 +239,7 @@ dumpLatest() {
 	printf "%15s %10s\n" "mpfr" "$(findLatestVersion "${GCC_INFRASTRUCTIRE_URL}" "mpfr-")"
 	printf "%15s %10s\n" "mpc" "$(findLatestVersion "${GCC_INFRASTRUCTIRE_URL}" "mpc-")"
 	printf "%15s %10s\n" "gmp" "$(findLatestVersion "${GCC_INFRASTRUCTIRE_URL}" "gmp-")"
+	printf "%15s %10s\n" "isl" "$(findLatestVersion "${GCC_INFRASTRUCTIRE_URL}" "isl-")"
 	printf "%15s %10s\n" "gdb" "$(findLatestVersion "${GDB_URL}" "gdb-")"
 	printf "%15s %10s\n" "newlib" "$(findLatestVersion "${NEWLIB_URL}" "newlib-")"
 }
