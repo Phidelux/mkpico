@@ -475,8 +475,14 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--infodir=${MKPICO_PREFIX}/share/info \
-	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_TARGET}-" \
+	--with-pkgversion="mkpico" \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
+	--with-no-thumb-interwork \
+	--with-mode=thumb \
+	--with-gnu-as \
+	--with-gnu-ld \
 	--disable-werror \
 	--disable-nls \
 	--enable-deterministic-archives
