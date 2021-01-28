@@ -584,8 +584,10 @@ buildPackage "gdb" "${GDB_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--with-pkgversion="mkpico" \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
 	--program-prefix="${MKPICO_TARGET}-" \
+	--with-pkgversion="mkpico" \
 	--enable-languages=c,c++ \
 	--disable-werror \
 	--disable-multilib
