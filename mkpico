@@ -63,8 +63,8 @@ including a gcc, newlib and an optional gdb.
 	Build the specified version of the ${MKPICO_TARGET} (default ${GCC_VERSION}).
 --build-newlib:
 	Build the specified version of the newlib (default ${NEWLIB_VERSION}).
--g|--build-gdb:
-	Additionally built the GNU debugger (default ${GDB_VERSION}).
+--build-gdb:
+	Build the specified version of the GNU debugger (default ${GDB_VERSION}).
 
 All --build-* options may be followed by a space seperated package version.
 In this case $(basename "${0}") will always attempt to build the custom
@@ -113,6 +113,7 @@ hasValue() {
 	return 1
 }
 
+# TODO: Add option to disable isl build.
 parseOptions() {
 	local nextOpt=0
 
@@ -157,7 +158,7 @@ parseOptions() {
 				fi
 
 				;;
-			-g|--build-gdb)
+			--build-gdb)
 				if hasValue "${2}"; then
 					GDB_VERSION="${2}"
 					shift
