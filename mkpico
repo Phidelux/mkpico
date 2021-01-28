@@ -406,12 +406,6 @@ buildPackage() {
 		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
 
-	if echo "gmp mpc mpfr isl" | grep -qsw "${package}$"; then
-		info "Checking build result of ${package}"
-		logrotate "${MKPICO_LOG_DIR}" "${package}-make-check.log" "${MKPICO_LOG_HISTORY}"
-		make check 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make-check.log"
-	fi
-
 	info "Installing ${package}"
 
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make-install.log" "${MKPICO_LOG_HISTORY}"
