@@ -336,16 +336,16 @@ buildPackage() {
 	shift 5
 
 	local real_package="${package}"
-	if echo "gcc-stage1" | grep -qsw "${package}$"; then
+	if [ "${package}" = "gcc-stage1" ]; then
 		real_package="gcc"
 	fi
 
-	if ! echo "gcc" | grep -qsw "${package}$"; then
+	if ! [ "${package}" = "gcc" ]; then
 		downloadExtract "${package_url}" "${package_name}" "${package_signature}"
 	fi
 
 	# Download prerequisits for gcc.
-	if echo "gcc-stage1" | grep -qsw "${package}$"; then
+	if [ "${package}" = "gcc-stage1" ]; then
 		info "Checking for contrib/download_prerequisites"
 		if [ -f "${MKPICO_BUILD_DIR}/${real_package}-${package_version}/contrib/download_prerequisites" ]; then
 			info "Downloading gcc prerequisites"
@@ -365,7 +365,7 @@ buildPackage() {
 
 	logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
 
-	if echo "gcc" | grep -qsw "${package}"; then
+	if [ "${package}" = "gcc" ]; then
 		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_PREFIX}" \
 		CXXFLAGS="${MKPICO_CXXFLAGS}" \
 		LDFLAGS="-L${MKPICO_PREFIX}/lib" \
@@ -395,10 +395,10 @@ buildPackage() {
 
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make.log" "${MKPICO_LOG_HISTORY}"
 
-	if echo "gcc-stage1" | grep -qsw "${package}"; then
+	if [ "${package}" = "gcc-stage1" ]; then
 		make -j${MKPICO_CORES} all-gcc all-target-libgcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
-	elif echo "newlib" | grep -qsw "${package}"; then
+	elif [ "${package}" = "newlib" ]; then
 		make -j${MKPICO_CORES} all \
 			CROSS_CFLAGS="-O2 -g -march=armv6s-m -mtune=cortex-m0plus -mthumb -mfloat-abi=soft -pipe -Wl,--no-copy-dt-needed-entries,--as-needed -Wl,--build-id -Wdate-time" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
@@ -406,7 +406,7 @@ buildPackage() {
 		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
 
-	if echo "gmp mpc mpfr isl" | grep -qsw "${package}"; then
+	if echo "gmp mpc mpfr isl" | grep -qsw "${package}$"; then
 		info "Checking build result of ${package}"
 		logrotate "${MKPICO_LOG_DIR}" "${package}-make-check.log" "${MKPICO_LOG_HISTORY}"
 		make check 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make-check.log"
@@ -416,7 +416,7 @@ buildPackage() {
 
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make-install.log" "${MKPICO_LOG_HISTORY}"
 
-	if echo "gcc-stage1" | grep -qsw "${package}"; then
+	if  [ "${package}" = "gcc-stage1" ]; then
 		make install-gcc install-target-libgcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	else
