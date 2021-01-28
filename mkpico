@@ -384,14 +384,10 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make.log" "${MKPICO_LOG_HISTORY}"
 
 	if [ "${package}" = "gcc-stage1" ]; then
-		make -j${MKPICO_CORES} all-gcc all-target-libgcc 2>&1 \
-			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
-	elif [ "${package}" = "newlib" ]; then
-		make -j${MKPICO_CORES} all \
-			CROSS_CFLAGS="-O2 -g -march=armv6s-m -mtune=cortex-m0plus -mthumb -mfloat-abi=soft -pipe -Wl,--no-copy-dt-needed-entries,--as-needed -Wl,--build-id -Wdate-time" 2>&1 \
+		make -j${MKPICO_CORES} all-gcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	else
-		make -j${MKPICO_CORES} 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
+		make -j${MKPICO_CORES} all 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
 
 	info "Installing ${package}"
