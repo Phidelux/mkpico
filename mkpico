@@ -289,15 +289,19 @@ download() {
 	local signature="${3}"
 
 	if [ -n "${signature}" ]; then
-		info "Downloading ${signature}"
-		# TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
-		curl -L -k -o "${MKPICO_SOURCE_DIR}/${signature}" "${url}/${signature}"
+		if ! [ -f "${MKPICO_SOURCE_DIR}/${signature}" ]; then
+			info "Downloading ${signature}"
+			# TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
+			curl -L -k -o "${MKPICO_SOURCE_DIR}/${signature}" "${url}/${signature}"
+		else
+			warning "Using signature ${signature} from cache - skipping"
+		fi
 	fi
 
 	if [ -f "${MKPICO_SOURCE_DIR}/${file}" ]; then
 		# Check using signature if file is corrupted and skip file if not.
-		if [ -n "${signature}" ] || isValidSignature "${GNU_KEYRING}" "${signature}" ; then
-			info "${file} in cache - skipping."
+		if [ -n "${signature}" ] && isValidSignature "${GNU_KEYRING}" "${signature}" ; then
+			warning "${file} in cache - skipping."
 		else
 			warning "Using unsigned ${file} from cache - skipping "
 		fi
@@ -332,19 +336,24 @@ buildPackage() {
 	shift 5
 
 	local real_package="${package}"
-	if echo "gcc-stage1" | grep -qsw "${package}"; then
+	if echo "gcc-stage1" | grep -qsw "${package}$"; then
 		real_package="gcc"
 	fi
 
-	downloadExtract "${package_url}" "${package_name}" "${package_signature}"
+	if ! echo "gcc" | grep -qsw "${package}$"; then
+		downloadExtract "${package_url}" "${package_name}" "${package_signature}"
+	fi
 
 	# Download prerequisits for gcc.
-	if echo "gcc-stage1" | grep -qsw "${package}"; then
+	if echo "gcc-stage1" | grep -qsw "${package}$"; then
 		info "Checking for contrib/download_prerequisites"
 		if [ -f "${MKPICO_BUILD_DIR}/${real_package}-${package_version}/contrib/download_prerequisites" ]; then
 			info "Downloading gcc prerequisites"
-			pushd "${MKPICO_BUILD_DIR}/${real_package}-${package_version}/"
-			./contrib/download_prerequisites
+			pushd "${MKPICO_BUILD_DIR}/${real_package}-${package_version}"
+			# This script also creates links in the build directory
+			./contrib/download_prerequisites \
+				--directory=${MKPICO_SOURCE_DIR} \
+				--isl --verify --sha512 --no-force
 			popd
 		fi
 	fi
@@ -463,23 +472,19 @@ mkdir -p "${MKPICO_SOURCE_DIR}"
 mkdir -p "${MKPICO_BUILD_DIR}"
 mkdir -p "${MKPICO_LOG_DIR}"
 
-downloadExtract "${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}"
-
-if ! [ -d "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}" ]; then
-	warning "Failed to extract newlib."
-	exit 1
-fi
-
 #rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/*"
 
 # Ensure CFLAGS are not set during build.
 unset CFLAGS
 
-info "Downloading gnu keyring"
-
 # Download the gnu keyring needed to verify signatures.
 # TODO: Downloading with -k is insecure, however currently the gnu cacert does not work.
-curl -s -L -k -o "${MKPICO_SOURCE_DIR}/${GNU_KEYRING}" "${GNU_MIRROR}/${GNU_KEYRING}" > /dev/null
+if ! [ -f "${MKPICO_SOURCE_DIR}/${GNU_KEYRING}" ]; then
+	info "Downloading gnu keyring"
+	curl -s -L -k -o "${MKPICO_SOURCE_DIR}/${GNU_KEYRING}" "${GNU_MIRROR}/${GNU_KEYRING}" > /dev/null
+else
+	warning "Using gnu keyring from cache - skipping"
+fi
 
 info "Installing packages"
 
