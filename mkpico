@@ -1,13 +1,13 @@
 #!/bin/sh
 
 # Abort on error.
-set -e -o pipefail
+set -e
 
 MKPICO_TARGET="arm-none-eabi"
 MKPICO_BUILD=$(uname -m)
 MKPICO_HOST=${MKPICO_BUILD}
 
-MKPICO_ROOT=`pwd`
+MKPICO_ROOT=$(pwd)
 MKPICO_LOG_DIR="${MKPICO_ROOT}/log"
 MKPICO_BUILD_DIR="${MKPICO_ROOT}/build"
 MKPICO_SOURCE_DIR="${MKPICO_ROOT}/source"
@@ -41,9 +41,9 @@ GDB_URL="${GNU_MIRROR}/gdb"
 NEWLIB_VERSION="4.1.0"
 NEWLIB_URL="https://sourceware.org/pub/newlib/"
 
-MKPICO_VERSION="0.1"
+MKPICO_VERSION="1.0"
 MKPICO_USAGE=$(cat <<EOF
-Usage: $(basename "${0}") [-hv]
+Usage: $(basename "${0}") [-hvdlp]
 Builds a full featured ${MKPICO_TARGET} toolchain for the RaspberryPi Pico
 including a gcc, newlib and an optional gdb.
 
@@ -73,31 +73,23 @@ EOF
 )
 
 # Helper functions.
-pushd() {
-	command pushd "$@" > /dev/null
-}
-
-popd() {
-	command popd > /dev/null
-}
-
 info() {
-	echo -e "\033[94mINFO:\033[39m $*" >&2
+	printf "\033[94mINFO:\033[39m %s\n" "${*}" >&2
 }
 
 warning() {
-	echo -e "\033[33mCAUTION:\033[39m $*" >&2
+	printf "\033[33mCAUTION:\033[39m %s\n" "${*}" >&2
 }
 
 usage() {
-	local rc=0
+	rc=0
 
 	if [ -n "${1}" ]; then
 		rc="${1}"
 	fi
 
 	if [ -n "${2}" ]; then
-		echo -e "ERROR: ${2}\n"
+		printf "ERROR: %s\n\n" "${2}"
 	fi
 
 	echo "${MKPICO_USAGE}"
@@ -115,8 +107,6 @@ hasValue() {
 
 # TODO: Add option to disable isl build.
 parseOptions() {
-	local nextOpt=0
-
 	# Parse the command line parameters.
 	while [ -n "${1+xxx}" ]; do
 		case "${1}" in
@@ -124,6 +114,8 @@ parseOptions() {
 				usage
 				;;
 			-v|--version)
+				echo "$(basename "$0") v${MKPICO_VERSION}"
+				exit 0
 				;;
 			-l|--latest)
 				;;
@@ -178,48 +170,48 @@ parseOptions() {
 }
 
 logrotate() {
-	LOG_DIR=$1
-	FILE=$2
-	COUNT=$3
+	log_dir=$1
+	file=$2
+	count=$3
 
-	if [ ! -d "${LOG_DIR}" ]; then
-		mkdir -p "${LOG_DIR}"
+	if [ ! -d "${log_dir}" ]; then
+		mkdir -p "${log_dir}"
 	fi
 
-	if [ -f "${LOG_DIR}/${FILE}.${COUNT}" ]; then
-		rm "${LOG_DIR}/${FILE}.${COUNT}"
+	if [ -f "${log_dir}/${file}.${count}" ]; then
+		rm "${log_dir}/${file}.${count}"
 	fi
 
-	while (( --COUNT >= 0 )); do
-		if [ -f "${LOG_DIR}/${FILE}.${COUNT}" ]; then
-			mv "${LOG_DIR}/${FILE}.${COUNT}" "${LOG_DIR}/${FILE}.$((COUNT+1))"
+	while [ $((count-=1)) -ge 0 ]; do
+		if [ -f "${log_dir}/${file}.${count}" ]; then
+			mv "${log_dir}/${file}.${count}" "${log_dir}/${file}.$((count+1))"
 		fi
 	done
 
-	if [ -f "${LOG_DIR}/${FILE}" ]; then
-		mv "${LOG_DIR}/${FILE}" "${LOG_DIR}/${FILE}.0"
+	if [ -f "${log_dir}/${file}" ]; then
+		mv "${log_dir}/${file}" "${log_dir}/${file}.0"
 	fi
 }
 
 findPackages() {
-	local url="${1}"
+	url="${1}"
 	if [ -z "${url}" ]; then
 		echo "No remote server url given"
 		exit 1
 	fi
 
-	local prefix="${2}"
+	prefix="${2}"
 	if [ -z "${prefix}" ]; then
 		echo "no package prefix given"
 		exit 1
 	fi
 
-	curl -k -L ${url} 2>/dev/null \
+	curl -k -L "${url}" 2>/dev/null \
 		| sed -n "s/.*href=\"[^\"]*\(${prefix}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\)[^\"]*\).*/\1/p"
 }
 
 findLatestPackage() {
-	local listing="$(findPackages "${1}" "${2}")"
+	listing="$(findPackages "${1}" "${2}")"
 
 	echo "${listing}" \
 		| sort -fir \
@@ -246,17 +238,17 @@ dumpLatest() {
 }
 
 extract() {
-	local file="${1}"
-	local filename="$(echo "${file}" | awk '{print tolower($0)}')"
+	file="${1}"
+	filename="$(echo "${file}" | awk '{print tolower($0)}')"
 
 	info "Extracting ${file}"
 
-	local target=""
+	target=""
 	if [ -n "${2}" ] && [ -d "${2}" ]; then
 		target="$(readlink -f "${2}")"
 	fi
 
-	pushd "${target}"
+	cd "${target}"
 	case "${filename}" in
 		*.tar* | *.tbz | *.tgz)
 			tar xf "${file}" ;;
@@ -269,12 +261,12 @@ extract() {
 		*.7z) 7z x "${file}" ;;
 		*.xz) unxz "${file}" ;;
 		*)
-			popd
+			cd -
 			echo "extract: '${file}' - unknown archive method"
 			return 1
 			;;
 	esac
-	popd
+	cd -
 
 	return 0
 }
@@ -284,9 +276,9 @@ isValidSignature() {
 }
 
 download() {
-	local url="${1}"
-	local file="${2}"
-	local signature="${3}"
+	url="${1}"
+	file="${2}"
+	signature="${3}"
 
 	if [ -n "${signature}" ]; then
 		if ! [ -f "${MKPICO_SOURCE_DIR}/${signature}" ]; then
@@ -327,15 +319,15 @@ downloadExtract() {
 }
 
 buildPackage() {
-	local package="${1}"
-	local package_version="${2}"
-	local package_url="${3}"
-	local package_name="${4}"
-	local package_signature="${5}"
+	package="${1}"
+	package_version="${2}"
+	package_url="${3}"
+	package_name="${4}"
+	package_signature="${5}"
 
 	shift 5
 
-	local real_package="${package}"
+	real_package="${package}"
 	if [ "${package}" = "gcc-stage1" ]; then
 		real_package="gcc"
 	fi
@@ -349,17 +341,17 @@ buildPackage() {
 		info "Checking for contrib/download_prerequisites"
 		if [ -f "${MKPICO_BUILD_DIR}/${real_package}-${package_version}/contrib/download_prerequisites" ]; then
 			info "Downloading gcc prerequisites"
-			pushd "${MKPICO_BUILD_DIR}/${real_package}-${package_version}"
+			cd "${MKPICO_BUILD_DIR}/${real_package}-${package_version}"
 			# This script also creates links in the build directory
 			./contrib/download_prerequisites \
-				--directory=${MKPICO_SOURCE_DIR} \
+				--directory="${MKPICO_SOURCE_DIR}" \
 				--isl --verify --sha512 --no-force
-			popd
+			cd -
 		fi
 	fi
 
 	mkdir -p "${MKPICO_BUILD_DIR}/${package}"
-	pushd "${MKPICO_BUILD_DIR}/${package}"
+	cd "${MKPICO_BUILD_DIR}/${package}"
 
 	info "Configuring ${package}"
 
@@ -384,10 +376,10 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make.log" "${MKPICO_LOG_HISTORY}"
 
 	if [ "${package}" = "gcc-stage1" ]; then
-		make -j${MKPICO_CORES} all-gcc 2>&1 \
+		make -j"${MKPICO_CORES}" all-gcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	else
-		make -j${MKPICO_CORES} all 2>&1 \
+		make -j"${MKPICO_CORES}" all 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
 
@@ -403,15 +395,15 @@ buildPackage() {
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	fi
 
-	popd
+	cd -
 
 	#rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/${package}*"
 }
 
 error() {
-	local parent_lineno="${1}"
-	local message="${2}"
-	local code="${3:-1}"
+	parent_lineno="${1}"
+	message="${2}"
+	code="${3:-1}"
 
 	if [ -n "${message}" ] ; then
 		echo "Error on or near line ${parent_lineno}: ${message}; exiting with status ${code}"
@@ -474,8 +466,8 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--mandir=${MKPICO_PREFIX}/share/man \
-	--infodir=${MKPICO_PREFIX}/share/info \
+	--mandir="${MKPICO_PREFIX}/share/man" \
+	--infodir="${MKPICO_PREFIX}/share/info" \
 	--program-prefix="${MKPICO_TARGET}-" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
@@ -497,8 +489,8 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--infodir=${MKPICO_PREFIX}/share/info \
-	--mandir=${MKPICO_PREFIX}/share/man \
+	--infodir="${MKPICO_PREFIX}/share/info" \
+	--mandir="${MKPICO_PREFIX}/share/man" \
 	--program-prefix="${MKPICO_TARGET}-" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
@@ -549,8 +541,8 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--infodir=${MKPICO_PREFIX}/share/info \
-	--mandir=${MKPICO_PREFIX}/share/man \
+	--infodir="${MKPICO_PREFIX}/share/info" \
+	--mandir="${MKPICO_PREFIX}/share/man" \
 	--program-prefix="${MKPICO_TARGET}-" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
@@ -561,7 +553,7 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--with-gnu-ld \
 	--with-newlib \
 	--with-system-zlib \
-	--with-build-time-tools=${MKPICO_PREFIX}/${MKPICO_TARGET}/bin \
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-mode=thumb \
 	--with-no-thumb-interwork \
 	--without-ppl \
