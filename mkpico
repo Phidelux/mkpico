@@ -15,7 +15,7 @@ MKPICO_CROSS_TOOLS="${MKPICO_ROOT}/cross-tools"
 
 MKPICO_LOG_HISTORY=3
 
-MKPICO_PREFIX="/usr"
+MKPICO_PREFIX="${MKPICO_CROSS_TOOLS}"
 
 MKPICO_CFLAGS="-O2 -pipe -fPIC"
 MKPICO_CXXFLAGS="-O2 -pipe -fPIC"
@@ -356,9 +356,9 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
 
 	if echo "gcc" | grep -qsw "${package}"; then
-		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}" \
+		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_PREFIX}" \
 		CXXFLAGS="${MKPICO_CXXFLAGS}" \
-		LDFLAGS="-L${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/lib" \
+		LDFLAGS="-L${MKPICO_PREFIX}/lib" \
 		CC=/usr/bin/gcc \
 		CXX=/usr/bin/g++ \
 		LD=/usr/bin/ld \
@@ -370,7 +370,7 @@ buildPackage() {
 		OBJCOPY=/usr/bin/objcopy \
 		OBJDUMP=/usr/bin/objdump \
 		READELF=/usr/bin/readelf \
-		READELF_FOR_TARGET="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}/bin/${MKPICO_TARGET}-readelf" \
+		READELF_FOR_TARGET="${MKPICO_PREFIX}/bin/${MKPICO_TARGET}-readelf" \
 		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
 	else
@@ -407,10 +407,10 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make-install.log" "${MKPICO_LOG_HISTORY}"
 
 	if echo "gcc-stage1" | grep -qsw "${package}"; then
-		make install-gcc install-target-libgcc DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
+		make install-gcc install-target-libgcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	else
-		make install DESTDIR=${MKPICO_CROSS_TOOLS} 2>&1 \
+		make install 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	fi
 
@@ -474,13 +474,6 @@ fi
 # Ensure CFLAGS are not set during build.
 unset CFLAGS
 
-# Prepare build environment.
-PREFIX="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}"
-export PREFIX
-
-PATH=${PATH}:${PREFIX}/bin
-export PATH
-
 info "Downloading gnu keyring"
 
 # Download the gnu keyring needed to verify signatures.
@@ -536,7 +529,7 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--with-newlib \
 	--disable-shared \
 	--disable-threads \
-	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-tune=cortex-m0plus \
 	--with-arch=armv6s-m \
 	--with-float=soft
@@ -580,7 +573,7 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--disable-libstdcxx-pch \
 	--without-ppl \
 	--without-cloog \
-	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
 	--with-arch=armv6s-m \
