@@ -395,7 +395,7 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-make-install.log" "${MKPICO_LOG_HISTORY}"
 
 	if  [ "${package}" = "gcc-stage1" ]; then
-		make install-gcc install-target-libgcc 2>&1 \
+		make install-gcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make-install.log"
 	else
 		make install 2>&1 \
