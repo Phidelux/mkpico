@@ -12,7 +12,6 @@ MKPICO_LOG_DIR="${MKPICO_ROOT}/log"
 MKPICO_BUILD_DIR="${MKPICO_ROOT}/build"
 MKPICO_SOURCE_DIR="${MKPICO_ROOT}/source"
 MKPICO_CROSS_TOOLS="${MKPICO_ROOT}/cross-tools"
-MKPICO_SYSROOT="${MKPICO_ROOT}/sysroot"
 
 MKPICO_LOG_HISTORY=3
 
@@ -510,7 +509,6 @@ mkdir -p "${MKPICO_CROSS_TOOLS}"
 mkdir -p "${MKPICO_SOURCE_DIR}"
 mkdir -p "${MKPICO_BUILD_DIR}"
 mkdir -p "${MKPICO_LOG_DIR}"
-mkdir -p "${MKPICO_SYSROOT}/usr/include"
 
 downloadExtract "${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}"
 
@@ -518,9 +516,6 @@ if ! [ -d "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}" ]; then
 	warning "Failed to extract newlib."
 	exit 1
 fi
-
-# The -RT combination would be preferable, but is not supported by all cp implementations.
-cp -r "${MKPICO_BUILD_DIR}/newlib-${NEWLIB_VERSION}/include" "${MKPICO_SYSROOT}/usr"
 
 #rm -rf "${MKPICO_BUILD_DIR:?"MKPICO_BUILD_DIR has not been set."}/*"
 
@@ -551,7 +546,6 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--infodir=${MKPICO_PREFIX}/share/info \
-	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_TARGET}-" \
 	--disable-werror \
@@ -565,7 +559,6 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
 	--program-prefix="${MKPICO_TARGET}-" \
 	--infodir=${MKPICO_PREFIX}/share/info \
