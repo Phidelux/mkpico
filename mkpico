@@ -496,14 +496,24 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--with-pkgversion="mkpico" \
-	--program-prefix="${MKPICO_TARGET}-" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
+	--program-prefix="${MKPICO_TARGET}-" \
+	--with-pkgversion="mkpico" \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
+	--enable-languages=c,c++ \
+	--enable-c99 \
+	--without-headers \
+	--without-ppl \
+	--without-cloog \
+	--with-newlib \
+	--with-no-thumb-interwork \
+	--with-mode=thumb \
 	--with-gnu-as \
 	--with-gnu-ld \
-	--enable-stage1-languages=c \
-	--enable-languages=c,c++ \
+	--with-system-zlib \
+	--with-newlib \
 	--disable-multilib \
 	--disable-interpreter \
 	--disable-libssp \
@@ -512,19 +522,8 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--disable-libquadmath \
 	--disable-nls \
 	--disable-gcj \
-	--enable-c99 \
-	--enable-clocale=gnu \
-	--enable-long-long \
-	--without-ppl \
-	--without-cloog \
-	--without-headers \
-	--with-newlib \
-	--disable-shared \
 	--disable-threads \
-	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
-	--with-tune=cortex-m0plus \
-	--with-arch=armv6s-m \
-	--with-float=soft
+	--disable-shared
 
 # Download, build and install libc.
 buildPackage "newlib" "${NEWLIB_VERSION}" \
