@@ -551,30 +551,31 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--program-prefix="${MKPICO_TARGET}-" \
-	--with-gnu-as \
-	--with-gnu-ld \
-	--with-newlib \
-	--enable-clocale=gnu \
-	--enable-__cxa_atexit \
-	--enable-long-long \
-	--enable-c99 \
-	--disable-multilib \
-	--disable-threads \
-	--enable-libssp \
-	--disable-libgomp \
-	--disable-gcj \
-	--disable-sjlj-exceptions \
-	--enable-languages=c,c++ \
-	--enable-gnu-indirect-function \
-	--disable-interpreter \
-	--disable-libstdcxx-pch \
-	--without-ppl \
-	--without-cloog \
-	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
 	--with-arch=armv6s-m \
-	--with-float=soft
+	--enable-languages=c,c++ \
+	--enable-c99 \
+	--with-gnu-as \
+	--with-gnu-ld \
+	--with-newlib \
+	--with-system-zlib \
+	--with-build-time-tools=${MKPICO_PREFIX}/${MKPICO_TARGET}/bin \
+	--with-mode=thumb \
+	--with-no-thumb-interwork \
+	--without-ppl \
+	--without-cloog \
+	--enable-libssp \
+	--enable-gnu-indirect-function \
+	--disable-multilib \
+	--disable-threads \
+	--disable-libgomp \
+	--disable-gcj \
+	--disable-sjlj-exceptions \
+	--disable-interpreter \
+	--disable-libstdcxx-pch \
+	--disable-nls \
+	--disable-shared
 
 # Download, build and install gdb.
 buildPackage "gdb" "${GDB_VERSION}" \
