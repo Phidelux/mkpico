@@ -3,7 +3,9 @@
 # Abort on error.
 set -e -o pipefail
 
-MKPICO_PLATFORM="arm-none-eabi"
+MKPICO_TARGET="arm-none-eabi"
+MKPICO_BUILD=$(uname -m)
+MKPICO_HOST=${MKPICO_BUILD}
 
 MKPICO_ROOT=`pwd`
 MKPICO_LOG_DIR="${MKPICO_ROOT}/log"
@@ -50,7 +52,7 @@ NEWLIB_URL="https://sourceware.org/pub/newlib/"
 MKPICO_VERSION="0.1"
 MKPICO_USAGE=$(cat <<EOF
 Usage: $(basename "${0}") [-hv]
-Builds a full featured ${MKPICO_PLATFORM} toolchain for the RaspberryPi Pico
+Builds a full featured ${MKPICO_TARGET} toolchain for the RaspberryPi Pico
 including a gcc, newlib and an optional gdb.
 
 -h|--help:
@@ -66,7 +68,7 @@ including a gcc, newlib and an optional gdb.
 -p|--prefix:
 	Installation prefix (default ${MKPICO_PREFIX}).
 --build-gcc:
-	Build the specified version of the ${MKPICO_PLATFORM} (default ${GCC_VERSION}).
+	Build the specified version of the ${MKPICO_TARGET} (default ${GCC_VERSION}).
 --build-newlib:
 	Build the specified version of the newlib (default ${NEWLIB_VERSION}).
 --build-gmp:
@@ -408,7 +410,7 @@ buildPackage() {
 		OBJCOPY=/usr/bin/objcopy \
 		OBJDUMP=/usr/bin/objdump \
 		READELF=/usr/bin/readelf \
-		READELF_FOR_TARGET="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}/bin/${MKPICO_PLATFORM}-readelf" \
+		READELF_FOR_TARGET="${MKPICO_CROSS_TOOLS}${MKPICO_PREFIX}/bin/${MKPICO_TARGET}-readelf" \
 		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
 	else
@@ -543,13 +545,15 @@ info "Installing packages"
 # Download, build and install binutils.
 buildPackage "binutils" "${BINUTILS_VERSION}" \
 	"${BINUTILS_URL}" "${BINUTILS_PACKAGE}" "${BINUTILS_SIGNATURE}" \
-	--target="${MKPICO_PLATFORM}" \
+	--target="${MKPICO_TARGET}" \
+	--build="${MKPICO_BUILD}" \
+	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix="${MKPICO_PLATFORM}-" \
+	--program-prefix="${MKPICO_TARGET}-" \
 	--disable-werror \
 	--disable-nls \
 	--enable-deterministic-archives
@@ -557,11 +561,13 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 # Download, build and install a stage 1 gcc.
 buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
-	--target="${MKPICO_PLATFORM}" \
+	--target="${MKPICO_TARGET}" \
+	--build="${MKPICO_BUILD}" \
+	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--with-sysroot="${MKPICO_SYSROOT}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix="${MKPICO_PLATFORM}-" \
+	--program-prefix="${MKPICO_TARGET}-" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
 	--with-gnu-as \
@@ -585,7 +591,7 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--with-newlib \
 	--disable-shared \
 	--disable-threads \
-	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
+	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-tune=cortex-m0plus \
 	--with-arch=armv6s-m \
 	--with-float=soft
@@ -593,7 +599,9 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 # Download, build and install libc.
 buildPackage "newlib" "${NEWLIB_VERSION}" \
 	"${NEWLIB_URL}" "${NEWLIB_PACKAGE}" "${NEWLIB_SIGNATURE}" \
-	--target="${MKPICO_PLATFORM}" \
+	--target="${MKPICO_TARGET}" \
+	--build="${MKPICO_BUILD}" \
+	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--disable-multilib \
 	--disable-newlib-supplied-syscalls
@@ -601,11 +609,13 @@ buildPackage "newlib" "${NEWLIB_VERSION}" \
 # Build and install gcc.
 buildPackage "gcc" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
-	--target="${MKPICO_PLATFORM}" \
+	--target="${MKPICO_TARGET}" \
+	--build="${MKPICO_BUILD}" \
+	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--infodir=${MKPICO_PREFIX}/share/info \
 	--mandir=${MKPICO_PREFIX}/share/man \
-	--program-prefix="${MKPICO_PLATFORM}-" \
+	--program-prefix="${MKPICO_TARGET}-" \
 	--with-gnu-as \
 	--with-gnu-ld \
 	--with-newlib \
@@ -625,7 +635,7 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--disable-libstdcxx-pch \
 	--without-ppl \
 	--without-cloog \
-	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_PLATFORM}/bin" \
+	--with-build-time-tools="${MKPICO_CROSS_TOOLS}/${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-pkgversion="mkpico" \
 	--with-tune=cortex-m0plus \
 	--with-arch=armv6s-m \
@@ -634,10 +644,12 @@ buildPackage "gcc" "${GCC_VERSION}" \
 # Download, build and install gdb.
 buildPackage "gdb" "${GDB_VERSION}" \
 	"${GDB_URL}" "${GDB_PACKAGE}" "${GDB_SIGNATURE}" \
-	--target="${MKPICO_PLATFORM}" \
+	--target="${MKPICO_TARGET}" \
+	--build="${MKPICO_BUILD}" \
+	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
 	--with-pkgversion="mkpico" \
-	--program-prefix="${MKPICO_PLATFORM}-" \
+	--program-prefix="${MKPICO_TARGET}-" \
 	--enable-languages=c,c++ \
 	--disable-werror \
 	--disable-multilib
