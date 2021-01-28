@@ -532,7 +532,13 @@ buildPackage "newlib" "${NEWLIB_VERSION}" \
 	--build="${MKPICO_BUILD}" \
 	--host="${MKPICO_HOST}" \
 	--prefix="${MKPICO_PREFIX}" \
-	--disable-multilib \
+	--with-tune=cortex-m0plus \
+	--with-arch=armv6s-m \
+	--with-mode=thumb \
+	--with-no-thumb-interwork \
+	--with-gnu-as \
+	--with-gnu-ld \
+	--disable-nls \
 	--disable-newlib-supplied-syscalls
 
 # Build and install gcc.
