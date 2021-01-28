@@ -387,7 +387,8 @@ buildPackage() {
 		make -j${MKPICO_CORES} all-gcc 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	else
-		make -j${MKPICO_CORES} all 2>&1 | tee "${MKPICO_LOG_DIR}/${package}-make.log"
+		make -j${MKPICO_CORES} all 2>&1 \
+			| tee "${MKPICO_LOG_DIR}/${package}-make.log"
 	fi
 
 	info "Installing ${package}"
