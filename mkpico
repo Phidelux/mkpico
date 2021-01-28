@@ -120,10 +120,10 @@ parseOptions() {
 	# Parse the command line parameters.
 	while [ -n "${1+xxx}" ]; do
 		case "${1}" in
-			--help|-h)
+			-h|--help)
 				usage
 				;;
-			--version|-v)
+			-v|--version)
 				;;
 			-l|--latest)
 				;;
