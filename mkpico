@@ -503,6 +503,8 @@ buildPackage "binutils" "${BINUTILS_VERSION}" \
 	--disable-nls \
 	--enable-deterministic-archives
 
+export PATH="${PATH}:${MKPICO_PREFIX}/bin"
+
 # Download, build and install a stage 1 gcc.
 buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	"${GCC_URL}" "${GCC_PACKAGE}" "${GCC_SIGNATURE}" \
