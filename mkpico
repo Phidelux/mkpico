@@ -366,21 +366,9 @@ buildPackage() {
 	logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
 
 	if [ "${package}" = "gcc" ]; then
-		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_PREFIX}" \
-		CXXFLAGS="${MKPICO_CXXFLAGS}" \
+		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_PREFIX}/include" \
+		CXXFLAGS="${MKPICO_CXXFLAGS} -I${MKPICO_PREFIX}/include" \
 		LDFLAGS="-L${MKPICO_PREFIX}/lib" \
-		CC=/usr/bin/gcc \
-		CXX=/usr/bin/g++ \
-		LD=/usr/bin/ld \
-		NM=/usr/bin/nm \
-		AS=/usr/bin/as \
-		AR=/usr/bin/ar \
-		RANLIB=/usr/bin/ranlib \
-		STRIP=/usr/bin/strip \
-		OBJCOPY=/usr/bin/objcopy \
-		OBJDUMP=/usr/bin/objdump \
-		READELF=/usr/bin/readelf \
-		READELF_FOR_TARGET="${MKPICO_PREFIX}/bin/${MKPICO_TARGET}-readelf" \
 		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
 			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
 	else
