@@ -193,7 +193,7 @@ logrotate() {
 	fi
 }
 
-findPackages() {
+findLatestVersion() {
 	url="${1}"
 	if [ -z "${url}" ]; then
 		echo "No remote server url given"
@@ -206,22 +206,14 @@ findPackages() {
 		exit 1
 	fi
 
-	curl -k -L "${url}" 2>/dev/null \
-		| sed -n "s/.*href=\"[^\"]*\(${prefix}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\)[^\"]*\).*/\1/p"
-}
+	packageVersions=$( \
+        curl -k -L "${url}" 2>/dev/null \
+		| sed -n "s/.*href=\"[^\"]*\(${prefix}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\)[^\"]*\).*/\1/p" \
+    )
 
-findLatestPackage() {
-	listing="$(findPackages "${1}" "${2}")"
-
-	echo "${listing}" \
-		| sort -fir \
-		| head -n 1
-}
-
-findLatestVersion() {
-	latestPackage="$(findLatestPackage "${1}" "${2}")"
-
-	echo "${latestPackage}" \
+	echo "${packageVersions}" \
+        | sort -fiVr \
+        | head -n 1 \
 		| sed -n "s/${2}\([0-9]\+\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\(\.[0-9]\+\)\?\).*/\1/p"
 }
 
