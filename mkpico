@@ -27,7 +27,7 @@ GNU_MIRROR="https://ftp.gnu.org/gnu/"
 GNU_KEYRING="gnu-keyring.gpg"
 
 # Package information
-BINUTILS_VERSION="2.35"
+BINUTILS_VERSION="2.39"
 BINUTILS_URL="${GNU_MIRROR}/binutils"
 
 GCC_VERSION="10.2.0"
@@ -35,10 +35,10 @@ GCC_URL="${GNU_MIRROR}/gcc/gcc-${GCC_VERSION}"
 
 GCC_INFRASTRUCTIRE_URL="https://gcc.gnu.org/pub/gcc/infrastructure/"
 
-GDB_VERSION="10.1"
+GDB_VERSION="12.1"
 GDB_URL="${GNU_MIRROR}/gdb"
 
-NEWLIB_VERSION="4.1.0"
+NEWLIB_VERSION="4.2.0"
 NEWLIB_URL="https://sourceware.org/pub/newlib/"
 
 MKPICO_VERSION="1.0"
