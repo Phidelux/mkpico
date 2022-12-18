@@ -38,7 +38,7 @@ GCC_INFRASTRUCTIRE_URL="https://gcc.gnu.org/pub/gcc/infrastructure/"
 GDB_VERSION="12.1"
 GDB_URL="${GNU_MIRROR}/gdb"
 
-NEWLIB_VERSION="4.2.0"
+NEWLIB_VERSION="4.2.0.20211231"
 NEWLIB_URL="https://sourceware.org/pub/newlib/"
 
 MKPICO_VERSION="1.0"
