@@ -552,6 +552,11 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--without-cloog \
 	--enable-libssp \
 	--enable-gnu-indirect-function \
+	--enable-newlib-reent-small \
+	--enable-newlib-nano-malloc \
+	--enable-lite-exit \
+	--enable-newlib-global-atexit \
+	--enable-newlib-nano-formatted-io \
 	--disable-multilib \
 	--disable-threads \
 	--disable-libgomp \
@@ -560,6 +565,10 @@ buildPackage "gcc" "${GCC_VERSION}" \
 	--disable-interpreter \
 	--disable-libstdcxx-pch \
 	--disable-nls \
+	--disable-newlib-fvwrite-in-streamio \
+	--disable-newlib-fseek-optimization \
+	--disable-newlib-wide-orient \
+	--disable-newlib-unbuf-stream-opt \
 	--disable-shared
 
 # Download, build and install gdb.
