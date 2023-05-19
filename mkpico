@@ -349,19 +349,11 @@ buildPackage() {
 
 	logrotate "${MKPICO_LOG_DIR}" "${package}-configure.log" "${MKPICO_LOG_HISTORY}"
 
-	if [ "${package}" = "gcc" ]; then
-		CFLAGS="${MKPICO_CFLAGS} -I${MKPICO_PREFIX}/include" \
-		CXXFLAGS="${MKPICO_CXXFLAGS} -I${MKPICO_PREFIX}/include" \
-		LDFLAGS="-L${MKPICO_PREFIX}/lib" \
-		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
-			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
-	else
-		CFLAGS="${MKPICO_CFLAGS}" \
-		CXXFLAGS="${MKPICO_CXXFLAGS}" \
-		LDFLAGS="${MKPICO_LDFLAGS}" \
-		../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
-			| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
-	fi
+	CFLAGS="${MKPICO_CFLAGS}" \
+	CXXFLAGS="${MKPICO_CXXFLAGS}" \
+	LDFLAGS="${MKPICO_LDFLAGS}" \
+	../"${real_package}"-"${package_version}"/configure "${@}" 2>&1 \
+		| tee "${MKPICO_LOG_DIR}/${package}-configure.log"
 
 	info "Building ${package}"
 
@@ -498,6 +490,7 @@ buildPackage "gcc-stage1" "${GCC_VERSION}" \
 	--with-gnu-as \
 	--with-gnu-ld \
 	--with-system-zlib \
+	--with-build-time-tools="${MKPICO_PREFIX}/${MKPICO_TARGET}/bin" \
 	--with-newlib \
 	--disable-multilib \
 	--disable-interpreter \
